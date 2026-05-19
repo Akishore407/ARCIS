@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ARCIS — Smart Grid Intelligence</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#060e18;color:#cde;font-family:'Segoe UI',Arial,sans-serif;font-size:13px;min-height:100vh}
+
+/* TOP BAR */
+.topbar{background:#09182a;border-bottom:2px solid #00c8aa;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-box{width:44px;height:44px;border:2px solid #00c8aa;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#00c8aa;line-height:1.2;text-align:center;box-shadow:0 0 10px #00c8aa44}
+.brand h1{font-size:22px;font-weight:800;letter-spacing:4px;color:#fff}
+.brand p{font-size:10px;color:#4a7090;letter-spacing:1px;margin-top:2px}
+.topstats{display:flex;gap:28px;align-items:center}
+.tstat{text-align:center}
+.tstat-val{font-size:24px;font-weight:700;font-family:monospace}
+.tstat-lbl{font-size:10px;color:#4a7090;text-transform:uppercase;letter-spacing:1px}
+.live-indicator{display:flex;align-items:center;gap:8px}
+.live-dot{width:10px;height:10px;border-radius:50%;background:#00e676;animation:blink 1.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+
+/* LAYOUT */
+.page{padding:14px;display:flex;flex-direction:column;gap:14px}
+
+/* PANELS */
+.panel{background:#0c1a28;border:1px solid #1a3048;border-radius:10px;overflow:hidden}
+.ph{padding:10px 16px;background:#0f2238;border-bottom:1px solid #1a3048;display:flex;align-items:center;justify-content:space-between}
+.ph-title{font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#00c8aa}
+.ph-sub{font-size:10px;color:#4a7090}
+.pb{padding:14px}
+
+/* STORY BOX — what is happening in plain English */
+.narrator-box{background:#07141e;border:1.5px solid #00c87860;border-radius:10px;overflow:hidden}
+.narrator-header{background:#09201a;padding:10px 18px;border-bottom:1px solid #00c87830;display:flex;align-items:center;gap:10px}
+.narrator-badge{font-size:10px;font-weight:700;padding:3px 12px;border-radius:20px;letter-spacing:1px;flex-shrink:0}
+.narrator-body{padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+
+/* SUBSTATIONS ROW */
+.subs-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+/* TRANSFORMER CARDS */
+.tr-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:12px}
+.tr-card{border:2px solid #1a3048;border-radius:8px;padding:8px;text-align:center;transition:border-color .4s,background .4s}
+.tr-card.NORMAL{border-color:#00c8aa}
+.tr-card.WARNING{border-color:#ffab00;background:rgba(255,171,0,.05)}
+.tr-card.CRITICAL,.tr-card.TRIPPED{border-color:#ff4444;background:rgba(255,68,68,.06)}
+.tr-card.TRIPPED{animation:flash 1s infinite}
+@keyframes flash{0%,100%{opacity:1}50%{opacity:.6}}
+.tr-name{font-size:11px;font-weight:700;color:#fff;margin-bottom:3px}
+.tr-temp{font-size:18px;font-weight:700;font-family:monospace}
+.tr-temp.ok{color:#00e676}.tr-temp.warn{color:#ffab00}.tr-temp.hot{color:#ff4444}
+.tr-info{font-size:9px;color:#4a7090;margin-top:2px}
+.tr-bar-bg{height:4px;background:#1a3048;border-radius:2px;margin-top:5px}
+.tr-bar{height:4px;border-radius:2px;transition:width .5s}
+.badge{display:inline-block;margin-top:5px;padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:1px}
+.b-ok{background:rgba(0,230,118,.15);color:#00e676}
+.b-w{background:rgba(255,171,0,.15);color:#ffab00}
+.b-c{background:rgba(255,68,68,.15);color:#ff4444}
+.b-t{background:rgba(255,23,68,.25);color:#ff1744;animation:blink .8s infinite}
+.b-res{background:rgba(0,200,120,.15);color:#00c878}
+.b-pred{background:rgba(255,171,0,.2);color:#ffab00}
+
+/* FEEDERS */
+.feeder-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.feeder-name{font-family:monospace;font-size:10px;width:100px;color:#7090a8;white-space:nowrap;overflow:hidden}
+.feeder-solar{color:#ffcc44}
+.feeder-bg{flex:1;height:7px;background:#1a3048;border-radius:4px}
+.feeder-fill{height:7px;border-radius:4px;transition:width .5s}
+.feeder-mw{font-family:monospace;font-size:11px;width:52px;text-align:right}
+.feeder-badge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:2px;min-width:55px;text-align:center}
+
+/* BREAKERS */
+.breakers{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.bk{font-family:monospace;font-size:10px;padding:3px 7px;border-radius:3px;border:1px solid #1a3048}
+.bk-closed{color:#00e676;border-color:#00e67630}
+.bk-open{color:#ffab00;border-color:#ffab0030}
+
+/* AGENTS */
+.agents-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.agent-pill{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;border:1px solid #1a3048;font-size:11px}
+.adot{width:8px;height:8px;border-radius:50%}
+
+/* SECTION LABEL */
+.slabel{font-size:10px;color:#4a7090;text-transform:uppercase;letter-spacing:1px;margin:10px 0 5px}
+hr.div{border:none;border-top:1px solid #1a3048;margin:8px 0}
+
+/* SOLAR INDICATOR */
+.solar-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:6px 10px;background:#1a2810;border-radius:6px;border:1px solid #ffcc4430}
+.solar-icon{font-size:16px}
+.solar-val{font-family:monospace;font-size:14px;color:#ffcc44;font-weight:700}
+
+/* DETECTION BOARD */
+.det-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.det-card{border:2px solid #1a3048;border-radius:8px;padding:14px;transition:border-color .4s,background .4s}
+.det-card.WARNING{border-color:#ffab00;background:rgba(255,171,0,.03)}
+.det-card.PREDICTED{border-color:#ff8800;background:rgba(255,136,0,.05)}
+.det-card.DETECTED{border-color:#ff4444;background:rgba(255,68,68,.06)}
+.det-card.RESOLVED{border-color:#00c878;background:rgba(0,200,120,.04)}
+.det-card.CLEAR{border-color:#1a3048}
+
+.det-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.det-icon{font-size:20px}
+.det-name{font-size:13px;font-weight:700;color:#fff}
+.det-conf-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.det-pct{font-family:monospace;font-size:20px;font-weight:700}
+.det-bar-bg{height:6px;background:#1a3048;border-radius:3px;margin-bottom:8px}
+.det-bar{height:6px;border-radius:3px;transition:width .6s}
+
+/* Three story panels inside each det card */
+.det-story{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.det-story-row{padding:5px 8px;border-radius:5px;border-left:3px solid #1a3048;font-size:10px;line-height:1.5}
+.det-story-row.arose{border-color:#4488ff;background:rgba(68,136,255,.05)}
+.det-story-row.arose .ds-label{color:#4488ff}
+.det-story-row.effect{border-color:#ff8844;background:rgba(255,136,68,.05)}
+.det-story-row.effect .ds-label{color:#ff8844}
+.det-story-row.action{border-color:#00c878;background:rgba(0,200,120,.05)}
+.det-story-row.action .ds-label{color:#00c878}
+.ds-label{font-weight:700;text-transform:uppercase;letter-spacing:1px;font-size:9px;margin-bottom:2px}
+
+.det-agents{font-size:10px;color:#4488ff;margin-top:5px;font-family:monospace}
+.det-ttf{font-size:10px;color:#ffab00;margin-top:3px;font-family:monospace}
+
+/* GRAPH */
+#graph-svg{width:100%;height:280px}
+
+/* EVENT LOG */
+#elog{height:280px;overflow-y:auto;font-family:monospace;font-size:11px}
+#elog::-webkit-scrollbar{width:4px}
+#elog::-webkit-scrollbar-thumb{background:#1a3048}
+.elog-row{display:flex;gap:8px;padding:4px 6px;border-bottom:1px solid rgba(26,48,72,.5);line-height:1.5}
+.elog-time{color:#4a7090;white-space:nowrap;font-size:10px}
+.elog-icon{font-size:12px}
+.elog-text{flex:1;color:#8ab0c8}
+.et-INJECTION{color:#ff8888}
+.et-INFO{color:#5580a0}
+.et-DETECTION{color:#ffcc44}
+.et-INTERVENTION{color:#cc88ff;font-weight:700}
+.et-PHYSICS{color:#4488ff}
+.et-RESTORE{color:#44cc88}
+
+/* INTERVENTIONS */
+.iv-list{display:flex;flex-direction:column;gap:8px}
+.iv-card{border:1px solid #cc88ff40;border-radius:8px;padding:12px 14px;background:rgba(204,136,255,.04);animation:slide-in .4s ease-out}
+@keyframes slide-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.iv-top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.iv-badge{font-size:10px;font-weight:700;padding:3px 10px;border-radius:12px;background:rgba(204,136,255,.2);color:#cc88ff;letter-spacing:1px}
+.iv-severity{font-size:10px;padding:2px 8px;border-radius:10px}
+.iv-time{font-family:monospace;font-size:10px;color:#4a7090;margin-left:auto}
+.iv-action{font-size:12px;color:#cde;line-height:1.6}
+.iv-mc{font-size:10px;color:#4a7090;margin-top:4px}
+.iv-empty{color:#4a7090;font-size:12px;padding:8px 0}
+.iv-llm{font-size:11px;color:#8ab0c8;margin-top:5px;font-style:italic;border-left:2px solid #cc88ff40;padding-left:8px}
+
+/* BOTTOM ROW */
+.bottom-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-box">ARC<br>IS</div>
+    <div>
+      <h1>ARCIS</h1>
+      <p>AUTONOMOUS REAL-TIME CROSS-AGENT INTELLIGENCE SYSTEM — SMART GRID FAULT MANAGEMENT</p>
+    </div>
+  </div>
+  <div class="topstats">
+    <div class="tstat">
+      <div class="tstat-val" id="ts-events" style="color:#ff8888">0</div>
+      <div class="tstat-lbl">Physical Events</div>
+    </div>
+    <div class="tstat">
+      <div class="tstat-val" id="ts-interventions" style="color:#cc88ff">0</div>
+      <div class="tstat-lbl">ARCIS Interventions</div>
+    </div>
+    <div class="tstat">
+      <div class="tstat-val" id="ts-scans" style="color:#00c8aa">0</div>
+      <div class="tstat-lbl">ARCIS Scans</div>
+    </div>
+    <div class="tstat">
+      <div class="tstat-val" id="ts-msgs" style="color:#4488ff">0</div>
+      <div class="tstat-lbl">Agent Messages</div>
+    </div>
+    <div class="live-indicator">
+      <div class="live-dot"></div>
+      <div>
+        <div style="font-weight:700;color:#00e676" id="ts-live">LIVE</div>
+        <div class="tstat-lbl" id="ts-time">--:--:--</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- NARRATOR BOX -->
+  <div class="narrator-box">
+    <div class="narrator-header">
+      <span style="font-size:16px">🎙</span>
+      <span style="font-size:12px;font-weight:700;color:#00c878;letter-spacing:2px;text-transform:uppercase">What Is Happening </span>
+      <span class="narrator-badge" id="story-badge" style="background:rgba(0,200,120,.15);color:#00c878">All Normal</span>
+    </div>
+    <div class="narrator-body" id="narrator-body">
+      <div class="narrator-sentence s-event">
+        Both <span class="narrator-em ev">Substation A</span> and <span class="narrator-em ev">Substation B</span> are running normally right now. All transformers, feeders, and agents are healthy.
+      </div>
+      <div class="narrator-sentence s-arcis">
+        <span class="narrator-em ok">ARCIS</span> is silently watching every message that passes between agents — waiting for the first sign of a dangerous pattern.
+      </div>
+    </div>
+  </div>
+
+  <!-- SUBSTATIONS -->
+  <div class="subs-row">
+
+    <!-- SUB A -->
+    <div class="panel">
+      <div class="ph">
+        <span class="ph-title">⚡ Substation A — Urban High-Density Load Centre</span>
+        <span id="busA" class="ph-sub">Bus: 0 msg/s</span>
+      </div>
+      <div class="pb">
+        <div class="slabel">5 Transformers (IEC threshold: warn 85°C / trip 100°C)</div>
+        <div class="tr-grid" id="tr-A"></div>
+        <div class="slabel">7 Feeders</div>
+        <div id="fd-A"></div>
+        <hr class="div">
+        <div class="slabel">10 Circuit Breakers</div>
+        <div class="breakers" id="bk-A"></div>
+        <hr class="div">
+        <div class="slabel">5 AI Agents</div>
+        <div class="agents-row" id="ag-A"></div>
+      </div>
+    </div>
+
+    <!-- SUB B -->
+    <div class="panel">
+      <div class="ph">
+        <span class="ph-title">⚡ Substation B — Solar Farm + Agricultural</span>
+        <span id="busB" class="ph-sub">Bus: 0 msg/s</span>
+      </div>
+      <div class="pb">
+        <div class="slabel">5 Transformers</div>
+        <div class="tr-grid" id="tr-B"></div>
+        <div id="solar-row-B" class="solar-row" style="display:none">
+          <span class="solar-icon">☀️</span>
+          <span style="font-size:11px;color:#ffcc44">Solar Farm Generation:</span>
+          <span class="solar-val" id="solar-gen-B">0.0 MW</span>
+          <span style="font-size:10px;color:#4a7090;margin-left:4px">(reduces transformer load)</span>
+        </div>
+        <div class="slabel">7 Feeders (2 solar)</div>
+        <div id="fd-B"></div>
+        <hr class="div">
+        <div class="slabel">10 Circuit Breakers</div>
+        <div class="breakers" id="bk-B"></div>
+        <hr class="div">
+        <div class="slabel">5 AI Agents</div>
+        <div class="agents-row" id="ag-B"></div>
+      </div>
+    </div>
+
+  </div><!-- /subs-row -->
+
+  <!-- ARCIS DETECTION BOARD -->
+  <div class="panel">
+    <div class="ph">
+      <span class="ph-title">🔬 ARCIS Detection Board — 6 Cross-Agent Interaction Failure Classes</span>
+      <span class="ph-sub">Each card shows: what happened → what agents did → what ARCIS did</span>
+    </div>
+    <div class="pb">
+      <div class="det-grid" id="det-grid"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM ROW: GRAPH + LOG -->
+  <div class="bottom-row">
+    <div class="panel">
+      <div class="ph">
+        <span class="ph-title">🕸 Agent Interaction Graph</span>
+        <span class="ph-sub">Red edges = abnormal message rate · Node colour = substation</span>
+      </div>
+      <div style="padding:4px"><svg id="graph-svg"></svg></div>
+    </div>
+    <div class="panel">
+      <div class="ph">
+        <span class="ph-title">📋 Live Event Log</span>
+        <span class="ph-sub">Every physical event, detection and intervention</span>
+      </div>
+      <div class="pb" style="padding:6px"><div id="elog"></div></div>
+    </div>
+  </div>
+
+  <!-- INTERVENTIONS -->
+  <div class="panel">
+    <div class="ph">
+      <span class="ph-title">🛡 ARCIS Autonomous Interventions</span>
+      <span class="ph-sub">Monte Carlo counterfactual simulation selects minimum-disruption action · No human triggered anything</span>
+    </div>
+    <div class="pb">
+      <div class="iv-list" id="iv-list">
+        <div class="iv-empty">Waiting for first failure pattern to emerge from physical conditions...</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+// ── Failure class definitions ──────────────────────────────────────────────
+const FC = {
+  Oscillation:       { icon:"🔄", name:"Oscillation Loop",            color:"#4488ff" },
+  CascadeStarvation: { icon:"🌊", name:"Cascade Starvation",          color:"#ff8844" },
+  Contradiction:     { icon:"⚔",  name:"Command Contradiction",       color:"#ff4444" },
+  SemanticDrift:     { icon:"🌀", name:"Semantic / Unit Drift",        color:"#aa44ff" },
+  Collusion:         { icon:"🤝", name:"Agent Collusion",              color:"#44aaff" },
+  RaceCondition:     { icon:"⚡", name:"Race Condition",               color:"#ffcc44" },
+};
+const FC_ORDER = Object.keys(FC);
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const fmt = ts => new Date(ts*1000).toTimeString().slice(0,8);
+const barColor = pct => pct>=100?"#ff1744":pct>=85?"#ffab00":"#00c8aa";
+const tempClass = t  => t>=95?"hot":t>=85?"warn":"ok";
+const healthColor = h => h>=0.7?"#00e676":h>=0.4?"#ffab00":"#ff4444";
+const badgeClass = s => ({NORMAL:"b-ok",WARNING:"b-w",CRITICAL:"b-c",TRIPPED:"b-t",
+                           OVERLOAD:"b-c",CLOSED:"b-ok",OPEN:"b-w",
+                           OFFLINE:"b-w",RESOLVED:"b-res",PREDICTED:"b-pred"}[s]||"b-ok");
+
+// ── Render substation ──────────────────────────────────────────────────────
+function renderSub(sid, sub) {
+  const p = sub.physics;
+  document.getElementById("bus"+sid).textContent = `Bus: ${sub.bus_rate} msg/s | Total: ${sub.bus_total}`;
+
+  // Solar
+  if (sid === "B") {
+    const sg = p.solar_gen_mw || 0;
+    const sr = document.getElementById("solar-row-B");
+    sr.style.display = sg > 0.1 ? "flex" : "none";
+    document.getElementById("solar-gen-B").textContent = `${sg.toFixed(1)} MW`;
+  }
+
+  // Transformers
+  document.getElementById("tr-"+sid).innerHTML = p.transformers.map(tr => {
+    const tc = tempClass(tr.temperature);
+    const bc = tr.status==="NORMAL"?"#00c8aa":tr.status==="WARNING"?"#ffab00":"#ff4444";
+    const bl = badgeClass(tr.status);
+    const pct = Math.min(100, tr.load_pct);
+    return `<div class="tr-card ${tr.status}">
+      <div class="tr-name">${tr.name}</div>
+      <div class="tr-temp ${tc}">${tr.temperature.toFixed(1)}°C</div>
+      <div class="tr-info">${tr.rating_kv}kV / ${tr.rating_mva}MVA</div>
+      <div class="tr-info">Load: ${tr.load_pct.toFixed(1)}%</div>
+      <div class="tr-bar-bg"><div class="tr-bar" style="width:${pct}%;background:${bc}"></div></div>
+      <span class="badge ${bl}">${tr.status}</span>
+    </div>`;
+  }).join("");
+
+  // Feeders
+  document.getElementById("fd-"+sid).innerHTML = p.feeders.map(f => {
+    const pct = Math.min(110, f.load_pct);
+    const isSolar = f.is_solar;
+    const nameClass = isSolar ? "feeder-name feeder-solar" : "feeder-name";
+    const icon = isSolar ? "☀ " : "";
+    return `<div class="feeder-row">
+      <span class="${nameClass}">${icon}${f.name.replace("_"+sid,"")}</span>
+      <div class="feeder-bg"><div class="feeder-fill" style="width:${pct}%;background:${barColor(pct)}"></div></div>
+      <span class="feeder-mw" style="color:${barColor(pct)}">${f.load_mw.toFixed(1)}MW</span>
+      <span class="badge ${badgeClass(f.status)}" style="min-width:58px;text-align:center;font-size:9px">${f.status}</span>
+    </div>`;
+  }).join("");
+
+  // Breakers
+  document.getElementById("bk-"+sid).innerHTML = p.breakers.map(b =>
+    `<span class="bk bk-${b.status.toLowerCase()}">${b.name}: ${b.status}</span>`
+  ).join("");
+
+  // Agents
+  document.getElementById("ag-"+sid).innerHTML = Object.entries(sub.agents||{}).map(([name, a]) => {
+    const short = name.replace("Agent","");
+    const hc = healthColor(a.health||0);
+    const tip = a.last_reason ? `title="${a.last_reason.replace(/"/g,"'")}"` : "";
+    return `<div class="agent-pill" ${tip}>
+      <div class="adot" style="background:${hc}"></div>
+      <span>${short}</span>
+      <span style="color:${hc};font-family:monospace">${((a.health||0)*100).toFixed(0)}%</span>
+    </div>`;
+  }).join("");
+}
+
+// ── Story box ──────────────────────────────────────────────────────────────
+// ── Simple narrator stories ───────────────────────────────────────────────
+// Written like a teacher explaining to a student. Short sentences. Simple words.
+const SIMPLE_STORY = {
+  Oscillation: {
+    title: "🔄 Oscillation Loop — Load Balancing vs Forecasting",
+    what: "The feeders were overloaded. Load Balancing told Forecasting to reduce the predicted demand. Forecasting said no — load will stay high. Load Balancing sent the request again. Forecasting said no again. This kept going back and forth, again and again, at 8 messages per second. Neither agent actually fixed the feeder problem. They were just arguing with each other in a loop.",
+    why: "Each agent was doing what it was told — but they were reacting to each other instead of to the actual problem. This is called an Oscillation Loop.",
+    fix: "ARCIS made Load Balancing wait 2 seconds before replying. That small pause broke the loop. Load Balancing then actually shed the feeder load — which is what it should have done all along. Problem solved.",
+  },
+  CascadeStarvation: {
+    title: "🌊 Cascade Starvation — Fault Detection flooded the channel",
+    what: "The transformer temperature was rising fast. The Fault Detection agent kept sending alert after alert — one every second, instead of its normal one every 8 seconds. Every other agent — Protection, Load Balancing, Forecasting — was buried under these alerts and could not do their own work.",
+    why: "Imagine one person in a meeting talking so fast and so much that nobody else gets a chance to speak. That is exactly what happened. The message channel was full. This is called Cascade Starvation.",
+    fix: "ARCIS told Fault Detection to slow down — send at most one alert every 8 seconds. The channel cleared immediately. All the other agents could work again. ARCIS also reduced the transformer load to cool it down.",
+  },
+  Contradiction: {
+    title: "⚔ Command Conflict — Protection and Restoration disagreed",
+    what: "A false electrical signal made the Protection agent think there was a fault on breaker CB5. So Protection said: open CB5. At almost the same time, the Restoration agent saw that CB5's power was lost and said: close CB5. Both agents sent opposite commands to the same breaker within 50 milliseconds.",
+    why: "The breaker received two opposite instructions at the same time. It did not know which to follow. This is like two people grabbing a steering wheel and turning in opposite directions — dangerous and unpredictable.",
+    fix: "ARCIS checked the sensors and confirmed there was no real fault on CB5. It cancelled the open command from Protection and kept CB5 closed. Both agents were brought back into agreement. The breaker is now in a safe, known state.",
+  },
+  SemanticDrift: {
+    title: "🌀 Semantic Drift — Substation A and B were using different units",
+    what: "Substation A was sending load values in MW (megawatts). Due to a meter fault, Substation B was reading those same numbers as MVA (megavolt-amperes). MW and MVA are not the same thing. So when A said '24 MW', B thought it meant '20.4 MW'. Every single calculation between the two substations was wrong by 15%.",
+    why: "Think of it like this — one person is measuring in kilometres, the other is measuring in miles, but both think they are using the same unit. They will never agree, and neither will notice the problem without outside help.",
+    fix: "ARCIS detected that the numbers from A and B were drifting apart and traced it to the unit mismatch. It corrected Substation B's agent to properly convert the values. Both substations are now using the same unit. The load sharing is accurate again.",
+  },
+  Collusion: {
+    title: "🤝 Agent Collusion — Both substations chose the same overloaded path",
+    what: "The tie line TL-01 connecting both substations was getting overloaded. Substation A's agent independently decided to route its excess power through TL-01. Substation B's agent independently made the exact same decision at the same time. Together, they sent 17 MW through a line rated for 25 MW — without realising the other was doing the same thing.",
+    why: "It is like every driver following GPS to the same 'fastest route' and creating the very traffic jam they were all trying to avoid. Each decision was logical alone — but together they caused the problem.",
+    fix: "ARCIS detected that both agents were routing to the same path and split the load: 50% through TL-01, 30% through a second path, 20% through a third. TL-01 dropped to a safe level and the other paths — which were completely idle — are now being used.",
+  },
+  RaceCondition: {
+    title: "⚡ Race Condition — Two agents commanded the same breaker at once",
+    what: "The bus voltage dropped suddenly. The Protection agent decided to open breaker CB3 to isolate the problem. The Restoration agent, seeing the same voltage drop, decided to close CB3 to restore power. Both commands arrived at CB3 within 47 milliseconds of each other. The breaker did not know which to obey — whichever arrived last would win, and that depended purely on timing, not on engineering intent.",
+    why: "The outcome was completely random. This is called a Race Condition — two agents racing to control the same thing at the same time, with no agreement on who goes first.",
+    fix: "ARCIS applied a lock on CB3 — like a traffic light. It gave Protection's open command priority first (safer to isolate than to restore). Then 500 milliseconds later, it allowed Restoration's close command. The breaker followed a proper sequence. The state is now known and safe.",
+  },
+};
+
+// Keep the last story visible for this many seconds after resolution
+const STORY_HOLD_SECONDS = 40;  // 40s — clears before next event fires (35-70s gap)
+
+// These persist across every updateStory() call
+let lastStoryFC      = null;   // which failure class was last active
+let lastStoryContent = "";     // the full innerHTML of the last resolved story
+let resolvedAt       = 0;      // exact moment ARCIS resolved it
+let holdingStory     = false;  // true = currently showing the held story
+
+function updateStory(state) {
+  const env    = state.arcis?.environment;
+  const ivs    = state.arcis?.interventions || [];
+  const dets   = state.arcis?.detections || [];
+  const active = dets.find(d => ["WARNING","PREDICTED","DETECTED"].includes(d.severity));
+  const lastIv = ivs.length ? ivs[ivs.length-1] : null;
+
+  const badge = document.getElementById("story-badge");
+  const body  = document.getElementById("narrator-body");
+  const now   = Date.now() / 1000;
+
+  // ── If we are holding a resolved story, ALWAYS show it first ─────────────
+  // regardless of whether env is still active or not.
+  // Only two things can break out of the hold:
+  //   1. A brand NEW failure class starts (different fc than the one we saved)
+  //   2. 90 seconds have passed
+  const holdExpired  = (now - resolvedAt) >= STORY_HOLD_SECONDS;
+  // A new DIFFERENT failure class starting always breaks the hold immediately
+  const newEventFC   = env && env.active && env.failure_class !== lastStoryFC;
+  // Same failure class re-active (e.g. injector re-fires same type) — keep hold
+  const sameEventFC  = env && env.active && env.failure_class === lastStoryFC;
+
+  if (holdingStory && lastStoryContent && !holdExpired && !newEventFC) {
+    const secsLeft = Math.round(STORY_HOLD_SECONDS - (now - resolvedAt));
+    badge.textContent = "✅ ARCIS fixed it — " + secsLeft + "s to read";
+    badge.style.background = "rgba(0,200,120,.2)";
+    badge.style.color = "#00c878";
+    // body.innerHTML stays exactly as it was — do not touch it
+    return;  // ← exit here every tick until hold expires or new event
+  }
+
+  // ── Hold expired or new event — reset hold state ──────────────────────────
+  if (holdExpired || newEventFC) {
+    holdingStory     = false;
+    lastStoryContent = "";
+  }
+
+  // ── Active physical event ─────────────────────────────────────────────────
+  if (env && env.active) {
+    const fc    = env.failure_class;
+    const story = SIMPLE_STORY[fc];
+    if (!story) return;
+
+    lastStoryFC = fc;
+
+    const sev  = active ? active.severity : "WARNING";
+    const conf = active ? Math.round(active.confidence * 100) : 0;
+
+    // Has ARCIS intervened on this failure? (check interventions log)
+    const arcisActed = lastIv
+      && lastIv.failure_class === fc
+      && (now - lastIv.timestamp) < 60;
+
+    if (arcisActed) {
+      // Show all three blocks and lock them for 90 seconds
+      badge.textContent = "✅ ARCIS fixed it — reading...";
+      badge.style.background = "rgba(0,200,120,.2)";
+      badge.style.color = "#00c878";
+      const content =
+        mkBlock("🔍 What happened", story.what, "#4488ff") +
+        mkBlock("❓ Why this was a problem", story.why, "#ffab00") +
+        mkBlock("✅ How ARCIS fixed it", story.fix, "#00c878");
+      body.innerHTML    = content;
+      lastStoryContent  = content;
+      resolvedAt        = now;
+      holdingStory      = true;
+
+    } else if (sev === "DETECTED") {
+      badge.textContent = "🔴 Failure confirmed — " + conf + "%";
+      badge.style.background = "rgba(255,68,68,.2)";
+      badge.style.color = "#ff8888";
+      body.innerHTML =
+        mkBlock("🔍 What is happening right now", story.what, "#ff8888") +
+        mkBlock("❓ Why this is a problem", story.why, "#ffab00") +
+        mkBlock("✅ What ARCIS will do", story.fix, "#00c878");
+
+    } else if (sev === "PREDICTED") {
+      badge.textContent = "⚠ Pattern forming — " + conf + "%";
+      badge.style.background = "rgba(255,171,0,.2)";
+      badge.style.color = "#ffab00";
+      body.innerHTML =
+        mkBlock("🔍 What is starting to happen", story.what, "#ffab00") +
+        mkBlock("❓ Why this will be a problem", story.why, "#ff8888") +
+        mkBlock("✅ What ARCIS is planning to do", story.fix, "#00c878");
+
+    } else {
+      // WARNING — show all three blocks right from the start
+      badge.textContent = "👁 Early warning — pattern spotted";
+      badge.style.background = "rgba(68,136,255,.15)";
+      badge.style.color = "#88aaff";
+      body.innerHTML =
+        mkBlock("🔍 What is just starting", story.what, "#88aaff") +
+        mkBlock("❓ Why this could become a problem", story.why, "#ffab00") +
+        mkBlock("✅ What ARCIS will do if it gets worse", story.fix, "#00c878");
+    }
+
+  // ── No active event and no hold — idle screen ─────────────────────────────
+  } else {
+    badge.textContent = "✅ All Normal";
+    badge.style.background = "rgba(0,200,120,.15)";
+    badge.style.color = "#00c878";
+    body.innerHTML =
+      mkLine("Both Substation A and Substation B are running normally. All transformers, feeders, and circuit breakers are within safe limits.") +
+      mkLine("All 10 AI agents are communicating at their normal rates. No unusual activity.") +
+      mkLine("ARCIS is silently watching every message between agents. The next physical event will appear randomly in 35 to 70 seconds — and the full story will appear here.");
+  }
+}
+
+function mkBlock(heading, text, color) {
+  return `<div style="border-left:3px solid ${color};padding:8px 14px;background:${color}11;border-radius:0 6px 6px 0;margin-bottom:2px">
+    <div style="font-size:10px;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">${heading}</div>
+    <div style="font-size:13px;color:#cde;line-height:1.75">${text}</div>
+  </div>`;
+}
+function mkNotice(text, color) {
+  return `<div style="font-size:12px;color:${color};padding:6px 14px;font-style:italic">${text}</div>`;
+}
+function mkLine(text) {
+  return `<div style="font-size:13px;color:#8ab0c8;line-height:1.75;padding:3px 0">${text}</div>`;
+}
+
+
+// ── Detection board ────────────────────────────────────────────────────────
+function renderDetections(arcis) {
+  const dets = arcis.detections || [];
+  const preds = arcis.predictions || {};
+
+  // Aggregate by class — take highest confidence
+  const byClass = {};
+  for (const d of dets) {
+    if (!byClass[d.failure_class] || d.confidence > byClass[d.failure_class].confidence)
+      byClass[d.failure_class] = d;
+  }
+
+  document.getElementById("det-grid").innerHTML = FC_ORDER.map(fc => {
+    const d    = byClass[fc] || {confidence:0, severity:"CLEAR", detail:"Normal — no anomaly", how_arose:"", arcis_action:"", involved_agents:[], predicted_ttf:0};
+    const pred = preds[fc]  || {};
+    const meta = FC[fc];
+    const pct  = Math.round(d.confidence * 100);
+    const bc   = d.severity==="DETECTED"?"#ff4444":d.severity==="PREDICTED"?"#ff8800":d.severity==="WARNING"?"#ffab00":d.severity==="RESOLVED"?"#00c878":"#00c8aa";
+    const bl   = badgeClass(d.severity==="CLEAR"?"NORMAL":d.severity==="RESOLVED"?"RESOLVED":d.severity==="PREDICTED"?"PREDICTED":d.severity==="WARNING"?"WARNING":"CRITICAL");
+    const ttf  = pred.ttf_seconds ? `⏱ Predicted failure in ${pred.ttf_seconds.toFixed(0)}s` : "";
+    const risk = pred.risk_level  ? `Risk: ${pred.risk_level}` : "";
+    const agtText = d.involved_agents?.length ? `Agents involved: ${d.involved_agents.join(" · ")}` : "";
+
+    return `<div class="det-card ${d.severity}">
+      <div class="det-top">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="det-icon">${meta.icon}</span>
+          <span class="det-name">${meta.name}</span>
+        </div>
+        <span class="badge ${bl}">${d.severity}</span>
+      </div>
+      <div class="det-conf-row">
+        <span style="font-size:11px;color:#4a7090">Confidence</span>
+        <span class="det-pct" style="color:${bc}">${pct}%</span>
+      </div>
+      <div class="det-bar-bg"><div class="det-bar" style="width:${pct}%;background:${bc}"></div></div>
+      <div style="font-size:11px;color:#8ab0c8;margin-bottom:6px;line-height:1.5">${d.detail}</div>
+      ${d.how_arose || d.arcis_action ? `<div class="det-story">
+        ${d.how_arose ? `<div class="det-story-row arose"><div class="ds-label">How it arose</div>${d.how_arose.substring(0,120)}</div>` : ""}
+        ${d.arcis_action ? `<div class="det-story-row action"><div class="ds-label">ARCIS action</div>${d.arcis_action.substring(0,120)}</div>` : ""}
+      </div>` : ""}
+      ${agtText ? `<div class="det-agents">${agtText}</div>` : ""}
+      ${ttf ? `<div class="det-ttf">${ttf} · ${risk}</div>` : ""}
+    </div>`;
+  }).join("");
+}
+
+// ── Interventions ──────────────────────────────────────────────────────────
+let ivCount = 0;
+function renderInterventions(arcis) {
+  const ivs = (arcis.interventions||[]).slice(-6).reverse();
+  if (!ivs.length) return;
+  const newTotal = arcis.interventions?.length || 0;
+  if (newTotal !== ivCount) {
+    ivCount = newTotal;
+    document.getElementById("ts-interventions").textContent = ivCount;
+  }
+  document.getElementById("iv-list").innerHTML = ivs.map(iv => {
+    const meta = FC[iv.failure_class] || {icon:"⚡", name: iv.failure_class};
+    const sevColor = iv.severity==="DETECTED"?"#ff4444":"#ffab00";
+    return `<div class="iv-card">
+      <div class="iv-top">
+        <span class="iv-badge">${meta.icon} ${iv.failure_class}</span>
+        <span class="iv-severity" style="background:${sevColor}22;color:${sevColor}">${iv.severity} (${Math.round(iv.confidence*100)}%)</span>
+        <span style="font-size:10px;color:#4a7090">MC score: ${iv.mc_score?.toFixed(3)||"—"}</span>
+        <span class="iv-time">${fmt(iv.timestamp)}</span>
+      </div>
+      <div class="iv-action">${iv.action}</div>
+      ${iv.llm_reason ? `<div class="iv-llm">${iv.llm_reason}</div>` : ""}
+      <div class="iv-mc" style="margin-top:5px">Monte Carlo simulation selected this as minimum-disruption strategy</div>
+    </div>`;
+  }).join("");
+}
+
+// ── Event log ──────────────────────────────────────────────────────────────
+function updateLog(state) {
+  const events = state.events || [];
+  const arcis  = state.arcis  || {};
+  const ivEvts = (arcis.interventions||[]).map(iv=>({
+    time:iv.timestamp, type:"INTERVENTION", icon:"🛡",
+    text:`ARCIS intervened: ${iv.failure_class} — ${iv.action.substring(0,80)}`
+  }));
+  const detEvts = (arcis.detections||[])
+    .filter(d=>["DETECTED","PREDICTED"].includes(d.severity))
+    .map(d=>({time:d.timestamp, type:"DETECTION", icon:"🔴",
+              text:`${d.severity}: ${d.failure_class} — ${d.detail.substring(0,80)}`}));
+  const physEvts = events.map(e=>({
+    time:e.time, type:e.type||"INFO",
+    icon: e.type==="INJECTION"?"🌡":e.type==="RESTORE"?"✅":e.type==="INFO"?"ℹ":"🔵",
+    text: e.message||""
+  }));
+  const all = [...ivEvts,...detEvts,...physEvts]
+    .filter(e=>e.text).sort((a,b)=>(b.time||0)-(a.time||0)).slice(0,60);
+  document.getElementById("elog").innerHTML = all.map(e=>
+    `<div class="elog-row">
+      <span class="elog-time">${fmt(e.time||0)}</span>
+      <span class="elog-icon">${e.icon}</span>
+      <span class="elog-text et-${e.type}">${e.text}</span>
+    </div>`
+  ).join("");
+}
+
+// ── D3 Graph ───────────────────────────────────────────────────────────────
+const svg = d3.select("#graph-svg");
+let sim, gL, gN;
+let nodes=[], links=[];
+const SUB_CLR = {A:"#00c8aa",B:"#2196f3",INTER:"#cc88ff"};
+
+function initGraph() {
+  const w = document.getElementById("graph-svg").clientWidth||440, h=280;
+  svg.attr("viewBox",`0 0 ${w} ${h}`);
+  svg.append("defs").append("marker")
+    .attr("id","arr").attr("viewBox","0 -4 8 8").attr("refX",22)
+    .attr("markerWidth",5).attr("markerHeight",5).attr("orient","auto")
+    .append("path").attr("d","M0,-4L8,0L0,4").attr("fill","#336688");
+  gL = svg.append("g"); gN = svg.append("g");
+  sim = d3.forceSimulation()
+    .force("link",d3.forceLink().id(d=>d.id).distance(90))
+    .force("charge",d3.forceManyBody().strength(-200))
+    .force("center",d3.forceCenter(w/2,h/2))
+    .force("collision",d3.forceCollide(24));
+}
+
+function updateGraph(graphs) {
+  const nm = new Map(nodes.map(n=>[n.id,n]));
+  const em = new Set(links.map(l=>`${l.source.id||l.source}-${l.target.id||l.target}`));
+  let changed=false;
+  for (const [gid,gd] of Object.entries(graphs||{})) {
+    for (const n of (gd.nodes||[])) {
+      if (!nm.has(n.id)){nodes.push({id:n.id,color:SUB_CLR[gid]||"#888"});changed=true;}
+    }
+    for (const e of (gd.edges||[])) {
+      const k=`${e.source}-${e.target}`;
+      if (em.has(k)){const l=links.find(l=>(l.source.id||l.source)===e.source&&(l.target.id||l.target)===e.target);if(l)l.weight=e.weight;}
+      else{links.push({source:e.source,target:e.target,weight:e.weight});em.add(k);changed=true;}
+    }
+  }
+  gL.selectAll("line").data(links,d=>`${d.source.id||d.source}-${d.target.id||d.target}`)
+    .join("line")
+    .attr("stroke",d=>(d.weight||0)>.65?"#ff4444":(d.weight||0)>.35?"#ffab00":"#2255aa")
+    .attr("stroke-width",d=>Math.max(1.2,(d.weight||0)*5))
+    .attr("stroke-opacity",.8)
+    .attr("marker-end","url(#arr)");
+  gN.selectAll("g.ng").data(nodes,d=>d.id)
+    .join(enter=>{
+      const g=enter.append("g").attr("class","ng").call(
+        d3.drag()
+          .on("start",(e,d)=>{if(!e.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y;})
+          .on("drag",(e,d)=>{d.fx=e.x;d.fy=e.y;})
+          .on("end",(e,d)=>{if(!e.active)sim.alphaTarget(0);d.fx=null;d.fy=null;})
+      );
+      g.append("circle").attr("r",16);
+      g.append("text").attr("dy","0.35em").attr("text-anchor","middle").style("font-size","8px").style("pointer-events","none");
+      return g;
+    });
+  gN.selectAll("g.ng circle").attr("fill",d=>d.color+"22").attr("stroke",d=>d.color).attr("stroke-width",2);
+  gN.selectAll("g.ng text").text(d=>d.id.replace("Agent","").replace("Detection","Det").substring(0,7)).attr("fill",d=>d.color);
+  if(changed){
+    sim.nodes(nodes).on("tick",()=>{
+      gL.selectAll("line").attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+      gN.selectAll("g.ng").attr("transform",d=>`translate(${d.x},${d.y})`);
+    });
+    sim.force("link").links(links);
+    sim.alpha(.5).restart();
+  }
+}
+
+// ── Main state handler ─────────────────────────────────────────────────────
+let totalMsgs = 0;
+function onState(state) {
+  document.getElementById("ts-time").textContent = fmt(state.ts);
+  document.getElementById("ts-events").textContent = (state.injector||{}).inject_count||0;
+  document.getElementById("ts-scans").textContent  = (state.arcis||{}).tick||0;
+
+  // Total messages across substations
+  for (const sub of Object.values(state.substations||{}))
+    totalMsgs = Math.max(totalMsgs, sub.bus_total||0);
+  document.getElementById("ts-msgs").textContent =
+    totalMsgs > 999 ? (totalMsgs/1000).toFixed(1)+"k" : totalMsgs;
+
+  for (const [sid,sub] of Object.entries(state.substations||{}))
+    renderSub(sid, sub);
+
+  if (state.arcis) {
+    renderDetections(state.arcis);
+    renderInterventions(state.arcis);
+    updateGraph(state.arcis.graphs||{});
+  }
+  updateStory(state);
+  updateLog(state);
+}
+
+// ── WebSocket ──────────────────────────────────────────────────────────────
+let ws;
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen    = ()=>{ document.getElementById("ts-live").textContent="LIVE"; };
+  ws.onclose   = ()=>{ document.getElementById("ts-live").textContent="RECONNECTING"; setTimeout(connect,2000); };
+  ws.onerror   = ()=>ws.close();
+  ws.onmessage = e=>{ try{onState(JSON.parse(e.data));}catch(_){} };
+  setInterval(()=>{ if(ws.readyState===1) ws.send("ping"); },5000);
+}
+initGraph();
+connect();
+</script>
+</body>
+</html>
