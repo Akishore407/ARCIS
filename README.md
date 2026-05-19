@@ -3,7 +3,7 @@
 
 ---
 
-## What ARCIS Does (Plain English)
+## What ARCIS Does 
 
 India's 2012 blackout — 620 million people — happened because every individual
 component worked correctly, but their **interactions** caused the collapse.
@@ -81,7 +81,7 @@ Open browser: **http://localhost:8000**
 
 ---
 
-## What Your Guide Will See
+## What is seen in the simulation dashboard
 
 1. **"What is happening right now" box** — 4-step plain English story:
    - Step 1: Physical event (e.g. "Transformer Thermal Runaway")
